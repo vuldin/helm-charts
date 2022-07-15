@@ -14,7 +14,6 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */}}
-
 {{/*
 Expand the name of the chart.
 */}}
@@ -42,6 +41,13 @@ Create chart name and version as used by the chart label.
 {{- end }}
 
 {{/*
+Get the version of redpanda being used as an image
+*/}}
+{{- define "redpanda.semver" -}}
+{{ .Values.image.tag | trimPrefix "v" }}
+{{- end }}
+
+{{/*
 Create the name of the service account to use
 */}}
 {{- define "redpanda.serviceAccountName" -}}
@@ -49,21 +55,6 @@ Create the name of the service account to use
 {{- default (include "redpanda.fullname" .) .Values.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
-{{- end }}
-{{- end }}
-
-{{/*
-Strip out the suffixes on memory to pass to Redpanda
-*/}}
-{{- define "redpanda.parseMemory" -}}
-{{- $type := typeOf .Values.statefulset.resources.limits.memory }}
-{{- if eq $type "float64" }}
-{{- .Values.statefulset.resources.limits.memory | int64 }}
-{{- else if eq $type "int" }}
-{{- .Values.statefulset.resources.limits.memory }}
-{{- else }}
-{{- $string := .Values.statefulset.resources.limits.memory | toString }}
-{{- regexReplaceAll "(\\d+)(\\w?)i?" $string "${1}${2}" }}
 {{- end }}
 {{- end }}
 
@@ -76,7 +67,7 @@ Generate configuration needed for rpk
 {{- end -}}
 
 {{- define "redpanda.kafka.internal.listen.port" -}}
-{{- (first .Values.config.redpanda.kafka_api).port -}}
+{{- (first .Values.listeners.kafka.endpoints).port -}}
 {{- end -}}
 
 {{- define "redpanda.internal.domain" -}}
@@ -93,7 +84,7 @@ Generate configuration needed for rpk
 {{- end -}}
 
 {{- define "redpanda.kafka.internal.advertise.port" -}}
-{{- (first .Values.config.redpanda.kafka_api).port -}}
+{{- (first .Values.listeners.kafka.endpoints).port -}}
 {{- end -}}
 
 {{- define "redpanda.kafka.external.listen.address" -}}
@@ -101,7 +92,7 @@ Generate configuration needed for rpk
 {{- end -}}
 
 {{- define "redpanda.kafka.external.listen.port" -}}
-{{- add1 (first .Values.config.redpanda.kafka_api).port -}}
+{{- (first .Values.listeners.kafka.endpoints).external.port | default (add1 (first .Values.listeners.kafka.endpoints).port) -}}
 {{- end -}}
 
 {{/*
@@ -117,7 +108,7 @@ IP is required for the advertised address.
 {{- end }}
 
 {{- define "redpanda.kafka.external.domain" -}}
-{{- printf "%s." (first .Values.config.redpanda.kafka_api).external.subdomain | trimSuffix "." | default "$(HOST_IP)" -}}
+{{- printf "%s." (first .Values.listeners.kafka.endpoints).external.subdomain | trimSuffix "." | default "$(HOST_IP)" -}}
 {{- end }}
 
 {{- define "redpanda.kafka.external.advertise.address" -}}
@@ -127,7 +118,7 @@ IP is required for the advertised address.
 {{- end -}}
 
 {{- define "redpanda.kafka.external.advertise.port" -}}
-{{- add1 (first .Values.config.redpanda.kafka_api).port -}}
+{{- (first .Values.listeners.kafka.endpoints).external.port | default (add1 (first .Values.listeners.kafka.endpoints).port) -}}
 {{- end -}}
 
 {{- define "redpanda.kafka.external.advertise.nodeport.address" -}}
@@ -135,26 +126,8 @@ IP is required for the advertised address.
 {{- end -}}
 
 {{- define "redpanda.kafka.external.advertise.nodeport.port" -}}
-{{- 32005 -}}
+{{- (first .Values.listeners.kafka.endpoints).external.port | default 32005 -}}
 {{- end -}}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 {{- define "redpanda.rpc.advertise.address" -}}
 {{- $host := "$(SERVICE_NAME)" -}}
@@ -163,7 +136,7 @@ IP is required for the advertised address.
 {{- end -}}
 
 {{- define "redpanda.rpc.advertise.port" -}}
-{{- .Values.config.redpanda.rpc_server.port -}}
+{{- .Values.listeners.rpc.port -}}
 {{- end -}}
 
 {{- define "redpanda.rpc.listen.address" -}}
@@ -171,7 +144,7 @@ IP is required for the advertised address.
 {{- end -}}
 
 {{ define "redpanda.rpc.listen.port" -}}
-{{- .Values.config.redpanda.rpc_server.port -}}
+{{- .Values.listeners.rpc.port -}}
 {{- end -}}
 
 {{- define "redpanda.admin.address" -}}
@@ -179,7 +152,7 @@ IP is required for the advertised address.
 {{- end -}}
 
 {{ define "redpanda.admin.port" -}}
-{{- .Values.config.redpanda.admin.port -}}
+{{- .Values.listeners.admin.port -}}
 {{- end -}}
 
 {{- define "redpanda.admin.external.address" -}}
@@ -187,14 +160,8 @@ IP is required for the advertised address.
 {{- end -}}
 
 {{ define "redpanda.admin.external.port" -}}
-{{- (add1 .Values.config.redpanda.admin.port) -}}
+{{- (add1 .Values.listeners.admin.port) -}}
 {{- end -}}
-
-
-
-
-
-
 
 {{- define "redpanda.pandaproxy.internal.advertise.address" -}}
 {{- $host := "$(SERVICE_NAME)" -}}
@@ -203,7 +170,7 @@ IP is required for the advertised address.
 {{- end -}}
 
 {{- define "redpanda.pandaproxy.internal.advertise.port" -}}
-{{- (first .Values.config.pandaproxy.pandaproxy_api).port -}}
+{{- (first .Values.listeners.rest.endpoints).port -}}
 {{- end -}}
 
 {{- define "redpanda.pandaproxy.internal.listen.address" -}}
@@ -211,7 +178,7 @@ IP is required for the advertised address.
 {{- end -}}
 
 {{- define "redpanda.pandaproxy.internal.listen.port" -}}
-{{- (first .Values.config.pandaproxy.pandaproxy_api).port -}}
+{{- (first .Values.listeners.rest.endpoints).port -}}
 {{- end -}}
 
 {{- define "redpanda.pandaproxy.external.listen.address" -}}
@@ -219,7 +186,7 @@ IP is required for the advertised address.
 {{- end -}}
 
 {{- define "redpanda.pandaproxy.external.listen.port" -}}
-{{- add1 (first .Values.config.pandaproxy.pandaproxy_api).port -}}
+{{- add1 (first .Values.listeners.rest.endpoints).port -}}
 {{- end -}}
 
 {{- define "redpanda.schemaregistry.internal.address" -}}
@@ -231,7 +198,7 @@ IP is required for the advertised address.
 {{- end -}}
 
 {{- define "redpanda.schemaregistry.internal.port" -}}
-{{- (first .Values.config.schema_registry.schema_registry_api).port -}}
+{{- (first .Values.listeners.schemaRegistry.endpoints).port -}}
 {{- end -}}
 
 {{- define "redpanda.schemaregistry.external.port" -}}
@@ -245,7 +212,7 @@ IP is required for the advertised address.
 {{- end -}}
 
 {{- define "redpanda.pandaproxy.external.advertise.port" -}}
-{{- add1 (first .Values.config.pandaproxy.pandaproxy_api).port -}}
+{{- add1 (first .Values.listeners.rest.endpoints).port -}}
 {{- end -}}
 
 {{- define "redpanda.pandaproxy.external.advertise.nodeport.address" -}}
@@ -253,5 +220,39 @@ IP is required for the advertised address.
 {{- end -}}
 
 {{- define "redpanda.pandaproxy.external.advertise.nodeport.port" -}}
-{{- add1 (first .Values.config.pandaproxy.pandaproxy_api).port -}}
+{{- add1 (first .Values.listeners.rest.endpoints).port -}}
+{{- end -}}
+
+{{/* ConfigMap variables */}}
+{{- define "admin-tls-enabled" -}}
+{{- $adminTlsEnabled1 := and .Values.auth.tls.enabled (or .Values.listeners.admin.tls.enabled (not (hasKey .Values.listeners.admin.tls "enabled"))) -}}
+{{- $adminTlsEnabled2 := and (not .Values.auth.tls.enabled) .Values.listeners.admin.tls.enabled -}}
+{{- print (and (or $adminTlsEnabled1 $adminTlsEnabled2) (not (empty .Values.listeners.admin.tls.cert))) -}}
+{{- end -}}
+
+{{- define "kafka-tls-enabled" -}}
+{{- $listener := first .Values.listeners.kafka.endpoints -}}
+{{ print (or $listener.tls.enabled (and (not (hasKey $listener.tls "enabled")) .Values.auth.tls.enabled)) }}
+{{- end -}}
+
+{{- define "rpc-tls-enabled" -}}
+{{- print (or .Values.listeners.rpc.tls.enabled (and (not (hasKey .Values.listeners.rpc.tls "enabled")) .Values.auth.tls.enabled)) -}}
+{{- end -}}
+
+{{- define "rest-tls-enabled" -}}
+{{- $listener := first .Values.listeners.rest.endpoints -}}
+{{ print (or $listener.tls.enabled (and (not (hasKey $listener.tls "enabled")) .Values.auth.tls.enabled)) }}
+{{- end -}}
+
+{{- define "schemaregistry-tls-enabled" -}}
+{{- $listener := first .Values.listeners.schemaRegistry.endpoints -}}
+{{ print (or $listener.tls.enabled (and (not (hasKey $listener.tls "enabled")) .Values.auth.tls.enabled)) }}
+{{- end -}}
+
+{{- define "tls-enabled" -}}
+{{- print (or (eq (include "admin-tls-enabled" .) "true") (eq (include "kafka-tls-enabled" .) "true") (eq (include "rest-tls-enabled" .) "true") (eq (include "rpc-tls-enabled" .) "true") (eq (include "schemaregistry-tls-enabled" .) "true")) -}}
+{{- end -}}
+
+{{- define "sasl-enabled" -}}
+{{- print .Values.auth.sasl.enabled | default "false" -}}
 {{- end -}}
