@@ -1,0 +1,57 @@
+# External access configuration
+external:
+  enabled: false
+
+logging:
+  # Valid values (from least to most logging) are warn, info, debug, trace
+  logLevel: info
+  usageStats:
+    enabled: false
+
+resources:
+  cpu:
+    cores: 1
+    overprovisioned: true
+  memory:
+    # Enables memory locking.
+    # For production: true
+    enable_memory_locking: true
+    container:
+      max: 2.5Gi
+
+statefulset:
+  podAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - podAffinityTerm:
+          labelSelector:
+            matchLabels:
+              app: edge-ha-db-timescaledb
+              cluster-name: edge-ha-db
+              release: edge-ha-db
+          namespaces:
+            - edge
+          topologyKey: kubernetes.io/hostname
+        weight: 10
+  podAntiAffinity:
+    type: soft
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/path: /public_metrics
+    prometheus.io/port: "9644"
+
+
+storage:
+  persistentVolume:
+    enabled: false
+    size: 32Gi
+    storageClass: edge-performance
+
+listeners:
+  http:
+    enabled: false
+  schemaRegistry:
+    enabled: false
+
+config:
+  cluster:
+    auto_create_topics_enabled: true
