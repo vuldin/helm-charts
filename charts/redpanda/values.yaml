@@ -45,7 +45,7 @@ tolerations: []
 image:
   repository: vectorized/redpanda
   # Redpanda version defaults to Chart.appVersion
-  tag: ""
+  tag: "v23.1.1"
   # The imagePullPolicy will default to Always when the tag is 'latest'
   pullPolicy: IfNotPresent
 # Your license key (optional)
@@ -108,7 +108,7 @@ tls:
   # Each listener must include a certificate name in its TLS section
   # Any certificates in auth.tls.certs will still be loaded if enabled is false
   # This is because listeners may enable TLS individually (see listeners.<listener name>.tls.enabled)
-  enabled: true
+  enabled: false
   # list all certificates below, then reference a certificate's name in each listener (see listeners.<listener name>.tls.cert)
   certs:
     # This is the certificate name that is used to associate the certificate with a listener
@@ -131,7 +131,7 @@ external:
   # External access type. Only `NodePort` and `LoadBalancer` are supported
   # If undefined, then advertised listeners will be configured in Redpanda, but the helm chart will not create a Service. You must create a Service manually.
   # Warning: If LoadBalancer is selected, you will likely experience higher latency and increased packet loss. NodePort is recommended in cases where latency is a priority.
-  type: NodePort
+  type: LoadBalancer
   # Optional source range for external access. Only applicable when external.type is LoadBalancer
   # sourceRanges: []
   # Optional domain advertised to external clients
@@ -463,7 +463,7 @@ post_upgrade_job:
 
 statefulset:
   # Number of Redpanda brokers (recommend setting this to the number of nodes in the cluster)
-  replicas: 3
+  replicas: 1
   updateStrategy:
     type: RollingUpdate
   budget:
@@ -609,15 +609,15 @@ listeners:
     # Optional external section
     external:
       # Name of the external listener
-      default:
+      default: {}
         # This overrides `external.enabled` for only this listener
         # enabled: true
         # The port advertised to this listener's external clients
         # List one port if you want to use the same port for each broker (would be the case when using NodePort service)
         # Otherwise list the port you want to use for each broker in order by statefulset replica
         # If undefined, `listeners.admin.port` is used
-        advertisedPorts:
-        - 31644
+        # advertisedPorts:
+        # - 31644
     # Optional TLS section (required if global TLS is enabled)
     tls:
       # Optional flag to override the global TLS enabled flag
@@ -629,7 +629,7 @@ listeners:
   # Kafka API listeners
   kafka:
     # The port for internal client connections
-    port: 9093
+    port: 10092
     tls:
       # enabled: true
       cert: default
@@ -638,14 +638,14 @@ listeners:
       default:
         # enabled: true
         # The port used for external client connections
-        port: 9094
+        port: 9092
         # If undefined, `listeners.kafka.external.default.port` is used
-        advertisedPorts:
-        - 31092
+        # advertisedPorts:
+        # - 31092
   # HTTP API listeners (aka PandaProxy)
   http:
     enabled: true
-    port: 8082
+    port: 9082
     kafkaEndpoint: default
     tls:
       # enabled: true
@@ -654,9 +654,9 @@ listeners:
     external:
       default:
         # enabled: true
-        port: 8083
-        advertisedPorts:
-        - 30082
+        port: 8082
+        # advertisedPorts:
+        # - 30082
   # RPC listener (this is never externally accessible)
   rpc:
     port: 33145
@@ -667,7 +667,7 @@ listeners:
   # Schema registry listeners
   schemaRegistry:
     enabled: true
-    port: 8081
+    port: 9081
     kafkaEndpoint: default
     tls:
       # enabled: true
@@ -676,9 +676,9 @@ listeners:
     external:
       default:
         # enabled: true
-        port: 8084
-        advertisedPorts:
-        - 30081
+        port: 8081
+        # advertisedPorts:
+        # - 30081
 
 # Expert Config
 
